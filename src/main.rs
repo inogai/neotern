@@ -77,9 +77,11 @@ const PALETTE_CSS: &str = "
 [data-role^='w'] .sf-t-code { background: var(--tv-cur, var(--accent)); color: var(--page); border: 0; box-shadow: none; border-radius: 0; padding: 0; font: inherit; }
 [data-role='float-text'] { padding: 0; background: none; box-shadow: none; }
 [data-role='float-text'] .sf-caret { display: none; }
-/* A float's card does not inherit the region's mono face, so fzf-lua and yazi came out in sans.
-   `--mono` is Tern's own monospace variable; `--sans` is what a view uses for prose. */
-.sf-editor { font-family: var(--mono); }
+/* A float's card does not inherit the region font, so fzf-lua and yazi came out in sans. Use the
+   same expression a region uses (`var(--tv-font, var(--mono))`) and scope it to the card: setting
+   it on every `.sf-editor` changed the advance of windows too, which drifts 'colorcolumn' and
+   fzf's border off their columns. */
+[data-role='float-text'] { font-family: var(--tv-font, var(--mono)); }
 ";
 
 fn main() -> Result<ExitCode, Box<dyn Error>> {
