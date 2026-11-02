@@ -329,7 +329,7 @@ fn view(grid: &Grid) -> View {
 	for (g, win, at) in floats {
 		let size = ui::Bound::wh(ui::Extent::Ch(win.w as f64), ui::Extent::Lines(win.h as f64));
 		let body = editor(grid, g, win.h, None, false, "float-text").min(size);
-		layer = layer.child(ui::overlay().key(g).role("float").anchor(at).size(ui::OverlaySize::Sm).child(body));
+		layer = layer.child(ui::overlay().key(format!("float {g}")).role("float").anchor(at).size(ui::OverlaySize::Sm).child(body));
 	}
 	if let Some((md, at)) = grid.doc.as_deref().zip(doc_at) {
 		let body = ui::md(md).key("d");
@@ -529,7 +529,7 @@ fn message(m: &grid::Msg) -> ui::Node {
 		_ => ui::Tone::Neutral,
 	};
 	if m.until.is_some() {
-		return ui::toast(text).key(m.key).tone(tone).into();
+		return ui::toast(text).key(format!("msg {}", m.key)).tone(tone).into();
 	}
 	let lines: Vec<&str> = text.lines().collect();
 	let tail = lines[lines.len().saturating_sub(30)..].join("\n");
