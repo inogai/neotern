@@ -418,7 +418,7 @@ fn editor(grid: &Grid, g: u64, h: usize, cursor: Option<(usize, usize)>, block: 
 	let (text, runs) = grid.text(g);
 	let mut decor = runs
 		.iter()
-		.map(|r| ui::Decor { from: r.from, to: r.to, s: token(grid, r.fg, r.bold, r.italic, r.marked), fx: None })
+		.map(|r| ui::Decor { from: r.from, to: r.to, s: token(grid, r.fg, r.bold, r.italic, r.marked, r.icon), fx: None })
 		.collect::<Vec<_>>();
 	if let Some((from, to)) = cursor.filter(|_| block) {
 		// `code` is a token with a background of its own, restyled as nvim's block cursor.
@@ -443,7 +443,7 @@ fn win_id(g: u64) -> String {
 /// The span tokens of a cell run. Tern 0.9.x only draws the tokens it knows, so a colour
 /// `colors.lua` mapped becomes that token; anything else keeps the old `c<rrggbb>` class, which
 /// now draws no class and leaves the run in the default text colour.
-fn token(grid: &Grid, fg: u32, bold: bool, italic: bool, marked: bool) -> String {
+fn token(grid: &Grid, fg: u32, bold: bool, italic: bool, marked: bool, icon: bool) -> String {
 	let mut s = match grid.tone(fg) {
 		Some(tone) => format!("{tone} mono"),
 		None => format!("c{fg:06x} mono"),
@@ -457,6 +457,9 @@ fn token(grid: &Grid, fg: u32, bold: bool, italic: bool, marked: bool) -> String
 	if marked {
 		s += " mark";
 	}
+	if icon {
+		s += " icon";
+	}
 	s
 }
 
@@ -464,8 +467,14 @@ fn token(grid: &Grid, fg: u32, bold: bool, italic: bool, marked: bool) -> String
 /// `ch` is the cell width and `--sf-lh` the line height, so the boxes land on nvim's grid.
 fn screen_css(splits: &[(u64, grid::Win)], rows: usize, cell: (f64, f64)) -> String {
 	let (cw, ch) = cell;
-	let _ = cw;
 	let mut css = format!("[data-role^='screen'] {{ position: relative; height: {}px; }}\n", rows as f64 * ch);
+	// Tern draws a Nerd Font glyph with its icon font, whose advance can be two cells, while nvim
+	// gave it one; the row would then drift right. Clamp every icon span in an editor to the cell
+	// nvim counted, so the rest of the row keeps its columns.
+	let _ = writeln!(
+		css,
+		"[data-role^='w'] .sf-t-icon {{ display: inline-block; width: {cw}px; overflow: hidden; }}"
+	);
 	for (g, win) in splits {
 		let (left, top) = (win.col as f64 * cw, win.row as f64 * ch);
 		let (w, h) = (win.w as f64 * cw, win.h as f64 * ch);

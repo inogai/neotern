@@ -199,6 +199,8 @@ pub struct Run {
 	pub italic: bool,
 	/// The cells carry a background of their own (a selection, a match, a diff).
 	pub marked: bool,
+	/// The run is a Nerd Font glyph (Private Use Area), which Tern draws with its icon font.
+	pub icon: bool,
 }
 
 /// A Telescope picker (`:h telescope`), from `telescope.lua`.
@@ -623,17 +625,20 @@ impl Grid {
 				let attr = self.hl.get(&cell.hl).copied().unwrap_or_default();
 				let (fg, len) = (attr.fg.unwrap_or(self.fg), cell.text.encode_utf16().count());
 				let marked = attr.bg.is_some_and(|bg| bg != self.bg) || attr.reverse;
+				let glyph = cell.text.chars().next().map_or(0, |c| c as u32);
+				let icon = matches!(glyph, 0xe000..=0xf8ff | 0xf0000..);
 				match runs.last_mut() {
 					Some(run)
 						if run.to == at
 							&& run.fg == fg
 							&& run.bold == attr.bold
 							&& run.italic == attr.italic
-							&& run.marked == marked =>
+							&& run.marked == marked
+							&& run.icon == icon =>
 					{
 						run.to += len;
 					},
-					_ => runs.push(Run { from: at, to: at + len, fg, bold: attr.bold, italic: attr.italic, marked }),
+					_ => runs.push(Run { from: at, to: at + len, fg, bold: attr.bold, italic: attr.italic, marked, icon }),
 				}
 				text.push_str(&cell.text);
 				at += len;
