@@ -745,6 +745,9 @@ impl Grid {
 
 	/// The Tern span token for a colour the colorscheme uses, when `colors.lua` mapped it.
 	pub fn tone(&self, fg: u32) -> Option<&str> { self.tones.get(&fg).map(String::as_str) }
+
+	/// nvim's default foreground, so a cell in it stays uncoloured.
+	pub fn default_fg(&self) -> u32 { self.fg }
 }
 
 #[cfg(test)]

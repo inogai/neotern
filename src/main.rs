@@ -454,7 +454,10 @@ fn win_id(g: u64) -> String {
 /// `colors.lua` mapped becomes that token; anything else keeps the old `c<rrggbb>` class, which
 /// now draws no class and leaves the run in the default text colour.
 fn token(grid: &Grid, run: &grid::Run) -> String {
-	let mut s = match grid.tone(run.fg) {
+	// A colour the colorscheme's groups name maps exactly; anything else is placed on the nearest
+	// semantic token by hue, so no cell is left in the default foreground.
+	let tone = grid.tone(run.fg).or_else(|| (run.fg != grid.default_fg()).then_some(nearest(run.fg)));
+	let mut s = match tone {
 		Some(tone) => format!("{tone} mono"),
 		None => format!("c{:06x} mono", run.fg),
 	};
@@ -649,5 +652,34 @@ mod tests {
 		assert_eq!(notation(&k("enter", Some("\r"))), "<CR>");
 		assert_eq!(notation(&Key { alt: true, ..k("f5", None) }), "<M-F5>");
 		assert_eq!(notation(&k("f", Some("f"))), "f");
+	}
+}
+
+/// The semantic token closest to a colour, so a colorscheme colour the group map missed still
+/// lands on Tern's theme instead of the default foreground.
+fn nearest(fg: u32) -> &'static str {
+	let (r, g, b) = (((fg >> 16) & 0xff) as i32, ((fg >> 8) & 0xff) as i32, (fg & 0xff) as i32);
+	let max = r.max(g).max(b);
+	let min = r.min(g).min(b);
+	// Grey: no hue to speak of, so pick by brightness.
+	if max - min < 24 {
+		return if max > 170 { "dim" } else { "muted" };
+	}
+	let hue = if max == r {
+		60 * (g - b) / (max - min)
+	} else if max == g {
+		60 * (b - r) / (max - min) + 120
+	} else {
+		60 * (r - g) / (max - min) + 240
+	};
+	let hue = (hue + 360) % 360;
+	match hue {
+		0..=20 | 340..=360 => "error",
+		21..=70 => "warning",
+		71..=170 => "success",
+		171..=200 => "info",
+		201..=265 => "link",
+		266..=339 => "accent",
+		_ => "muted",
 	}
 }
