@@ -204,6 +204,8 @@ pub struct Run {
 	/// The run is box drawing or a block element (`│`, `▏`). Tern's italic is synthetic for the
 	/// terminal face, so an italic guide leans off the column it is drawn to form.
 	pub box_glyph: bool,
+	/// The cell is a double-width char: nvim gave it two cells, the second one empty.
+	pub wide: bool,
 }
 
 /// A Telescope picker (`:h telescope`), from `telescope.lua`.
@@ -631,6 +633,7 @@ impl Grid {
 				let glyph = cell.text.chars().next().map_or(0, |c| c as u32);
 				let icon = matches!(glyph, 0xe000..=0xf8ff | 0xf0000..);
 				let box_glyph = matches!(glyph, 0x2500..=0x259f);
+				let wide = cells.get(r, c + 1).is_some_and(|n| n.text.is_empty());
 				match runs.last_mut() {
 					Some(run)
 						if run.to == at
@@ -639,11 +642,12 @@ impl Grid {
 							&& run.italic == attr.italic
 							&& run.marked == marked
 							&& run.icon == icon
-							&& run.box_glyph == box_glyph =>
+							&& run.box_glyph == box_glyph
+							&& run.wide == wide =>
 					{
 						run.to += len;
 					},
-					_ => runs.push(Run { from: at, to: at + len, fg, bold: attr.bold, italic: attr.italic, marked, icon, box_glyph }),
+					_ => runs.push(Run { from: at, to: at + len, fg, bold: attr.bold, italic: attr.italic, marked, icon, box_glyph, wide }),
 				}
 				text.push_str(&cell.text);
 				at += len;

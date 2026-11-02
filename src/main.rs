@@ -428,7 +428,7 @@ fn editor(grid: &Grid, g: u64, h: usize, cursor: Option<(usize, usize)>, block: 
 	let (text, runs) = grid.text(g);
 	let mut decor = runs
 		.iter()
-		.map(|r| ui::Decor { from: r.from, to: r.to, s: token(grid, r.fg, r.bold, r.italic, r.marked, r.icon, r.box_glyph), fx: None })
+		.map(|r| ui::Decor { from: r.from, to: r.to, s: token(grid, r), fx: None })
 		.collect::<Vec<_>>();
 	if let Some((from, to)) = cursor.filter(|_| block) {
 		// `code` is a token with a background of its own, restyled as nvim's block cursor.
@@ -453,23 +453,28 @@ fn win_id(g: u64) -> String {
 /// The span tokens of a cell run. Tern 0.9.x only draws the tokens it knows, so a colour
 /// `colors.lua` mapped becomes that token; anything else keeps the old `c<rrggbb>` class, which
 /// now draws no class and leaves the run in the default text colour.
-fn token(grid: &Grid, fg: u32, bold: bool, italic: bool, marked: bool, icon: bool, box_glyph: bool) -> String {
-	let mut s = match grid.tone(fg) {
+fn token(grid: &Grid, run: &grid::Run) -> String {
+	let mut s = match grid.tone(run.fg) {
 		Some(tone) => format!("{tone} mono"),
-		None => format!("c{fg:06x} mono"),
+		None => format!("c{:06x} mono", run.fg),
 	};
-	if bold {
+	if run.bold {
 		s += " strong";
 	}
 	// A guide drawn with synthetic italic leans off its column; keep box glyphs upright.
-	if italic && !box_glyph {
+	if run.italic && !run.box_glyph {
 		s += " em";
 	}
-	if marked {
+	if run.marked {
 		s += " mark";
 	}
-	if icon {
+	if run.icon {
 		s += " icon";
+	}
+	// A CJK char is one UTF-16 unit but two cells: pin its box to two cells so the rest of the row
+	// keeps nvim's columns.
+	if run.wide {
+		s += " wide";
 	}
 	s
 }
@@ -486,6 +491,13 @@ fn screen_css(splits: &[(u64, grid::Win)], rows: usize, cell: (f64, f64)) -> Str
 	let _ = writeln!(
 		css,
 		".sf-editor .sf-t-icon {{ display: inline-block; width: {cw}px; }}"
+	);
+	// A CJK char is one UTF-16 unit but two cells; if the mono face draws it at one cell the rest
+	// of the row slides left, one cell per char. Pin the box to two cells.
+	let _ = writeln!(
+		css,
+		".sf-editor .sf-t-wide {{ display: inline-block; width: {}px; }}",
+		cw * 2.0
 	);
 	for (g, win) in splits {
 		let (left, top) = (win.col as f64 * cw, win.row as f64 * ch);
