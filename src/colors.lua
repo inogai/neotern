@@ -94,11 +94,36 @@ local palette = {
 	[14] = 'info',
 }
 
+-- nvim's own default ANSI palette, used when the colorscheme does not set `terminal_color_*`
+-- (catppuccin does not), which is what a terminal buffer's cells carry in that case.
+local defaults = {
+	[0] = '000000',
+	[1] = 'cd0000',
+	[2] = '00cd00',
+	[3] = 'cdcd00',
+	[4] = '0000ee',
+	[5] = 'cd00cd',
+	[6] = '00cdcd',
+	[7] = 'e5e5e5',
+	[8] = '7f7f7f',
+	[9] = 'ff0000',
+	[10] = '00ff00',
+	[11] = 'ffff00',
+	[12] = '5c5cff',
+	[13] = 'ff00ff',
+	[14] = '00ffff',
+	[15] = 'ffffff',
+}
+
 local function send()
 	local out = {}
 	for i, token in pairs(palette) do
 		local c = vim.g['terminal_color_' .. i]
-		if type(c) == 'string' then out[#out + 1] = { (c:gsub('^#', '')), token } end
+		if type(c) == 'string' then
+			out[#out + 1] = { (c:gsub('^#', '')), token }
+		elseif defaults[i] then
+			out[#out + 1] = { defaults[i], token }
+		end
 	end
 	for group, token in pairs(tokens) do
 		local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })

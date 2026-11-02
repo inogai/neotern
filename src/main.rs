@@ -471,11 +471,6 @@ fn token(grid: &Grid, run: &grid::Run) -> String {
 	if run.icon {
 		s += " icon";
 	}
-	// A CJK char is one UTF-16 unit but two cells: pin its box to two cells so the rest of the row
-	// keeps nvim's columns.
-	if run.wide {
-		s += " wide";
-	}
 	s
 }
 
@@ -491,13 +486,6 @@ fn screen_css(splits: &[(u64, grid::Win)], rows: usize, cell: (f64, f64)) -> Str
 	let _ = writeln!(
 		css,
 		".sf-editor .sf-t-icon {{ display: inline-block; width: {cw}px; }}"
-	);
-	// A CJK char is one UTF-16 unit but two cells; if the mono face draws it at one cell the rest
-	// of the row slides left, one cell per char. Pin the box to two cells.
-	let _ = writeln!(
-		css,
-		".sf-editor .sf-t-wide {{ display: inline-block; width: {}px; }}",
-		cw * 2.0
 	);
 	for (g, win) in splits {
 		let (left, top) = (win.col as f64 * cw, win.row as f64 * ch);
