@@ -468,7 +468,7 @@ fn token(grid: &Grid, run: &grid::Run) -> String {
 	if run.marked {
 		s += " mark";
 	}
-	if run.icon {
+	if run.icon || run.wide {
 		s += " icon";
 	}
 	s

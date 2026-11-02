@@ -204,6 +204,9 @@ pub struct Run {
 	/// The run is box drawing or a block element (`│`, `▏`). Tern's italic is synthetic for the
 	/// terminal face, so an italic guide leans off the column it is drawn to form.
 	pub box_glyph: bool,
+	/// The run is a double-width character (CJK). It is drawn in a one-cell icon box and followed
+	/// by a space, so the pair advances two cells like nvim counts it.
+	pub wide: bool,
 }
 
 /// A Telescope picker (`:h telescope`), from `telescope.lua`.
@@ -626,7 +629,13 @@ impl Grid {
 					continue;
 				}
 				let attr = self.hl.get(&cell.hl).copied().unwrap_or_default();
-				let (fg, len) = (attr.fg.unwrap_or(self.fg), cell.text.encode_utf16().count());
+				// A double-width char is one UTF-16 unit but two cells: draw it in a one-cell icon
+				// box and add the space that fills the second cell.
+				let wide = cells.get(r, c + 1).is_some_and(|next| next.text.is_empty());
+				let (fg, unit) = (
+					attr.fg.unwrap_or(self.fg),
+					cell.text.encode_utf16().count(),
+				);
 				let marked = attr.bg.is_some_and(|bg| bg != self.bg) || attr.reverse;
 				let glyph = cell.text.chars().next().map_or(0, |c| c as u32);
 				let icon = matches!(glyph, 0xe000..=0xf8ff | 0xf0000..);
@@ -639,14 +648,20 @@ impl Grid {
 							&& run.italic == attr.italic
 							&& run.marked == marked
 							&& run.icon == icon
-							&& run.box_glyph == box_glyph =>
+							&& run.box_glyph == box_glyph
+							&& run.wide == wide =>
 					{
-						run.to += len;
+						run.to += unit;
 					},
-					_ => runs.push(Run { from: at, to: at + len, fg, bold: attr.bold, italic: attr.italic, marked, icon, box_glyph }),
+					_ => runs.push(Run { from: at, to: at + unit, fg, bold: attr.bold, italic: attr.italic, marked, icon, box_glyph, wide }),
 				}
 				text.push_str(&cell.text);
-				at += len;
+				at += unit;
+				if wide {
+					text.push(' ');
+					at += 1;
+				}
+
 			}
 		}
 		(text, runs)
@@ -689,7 +704,7 @@ impl Grid {
 			}
 			let last = if row == r { c } else { cells.w };
 			for col in 0..last.min(cells.w) {
-				at += cells.get(row, col).map_or(1, |cell| cell.text.encode_utf16().count());
+				at += if cells.get(row, col).is_some() { cell_units(cells, row, col) } else { 1 };
 			}
 		}
 		at
@@ -707,7 +722,7 @@ impl Grid {
 				if at >= offset {
 					return (row, col);
 				}
-				at += cells.get(row, col).map_or(1, |cell| cell.text.encode_utf16().count());
+				at += if cells.get(row, col).is_some() { cell_units(cells, row, col) } else { 1 };
 			}
 			if at >= offset {
 				return (row, cells.w.saturating_sub(1));
@@ -850,4 +865,15 @@ fn sgr(fg: u32, bg: Option<u32>) -> String {
 		out.push_str(&format!("\x1b[48;2;{r};{g};{b}m"));
 	}
 	out
+}
+
+/// The UTF-16 units cell `(r, c)` contributes to the text: a double-width char carries its
+/// padding space, and the empty right half of it contributes nothing.
+fn cell_units(cells: &Cells, r: usize, c: usize) -> usize {
+	let len = cells.get(r, c).map_or(0, |cell| cell.text.encode_utf16().count());
+	if len > 0 && cells.get(r, c + 1).is_some_and(|next| next.text.is_empty()) {
+		len + 1
+	} else {
+		len
+	}
 }
