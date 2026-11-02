@@ -652,6 +652,33 @@ impl Grid {
 		(text, runs)
 	}
 
+	/// Grid `g` as ANSI rows, for Tern's `ansi` node. It keeps every colour nvim sent, at the cost
+	/// of the caret, the selection and the click mapping an `editor` node gives.
+	pub fn ansi(&self, g: u64) -> String {
+		let Some(cells) = self.grids.get(&g) else { return String::new() };
+		let mut out = String::new();
+		for r in 0..cells.h {
+			let (mut cur_fg, mut cur_bg) = (None, None);
+			for c in 0..cells.w {
+				let cell = cells.get(r, c).unwrap_or(&self.blank);
+				if cell.text.is_empty() {
+					continue;
+				}
+				let attr = self.hl.get(&cell.hl).copied().unwrap_or_default();
+				let fg = attr.fg.unwrap_or(self.fg);
+				let bg = attr.bg.filter(|bg| *bg != self.bg);
+				if cur_fg != Some(fg) || cur_bg != bg {
+					out.push_str(&sgr(fg, bg));
+					cur_fg = Some(fg);
+					cur_bg = bg;
+				}
+				out.push_str(&cell.text);
+			}
+			out.push_str("\x1b[0m\n");
+		}
+		out
+	}
+
 	/// The offset Tern counts for cell `(r, c)` of grid `g`.
 	pub fn offset(&self, g: u64, r: usize, c: usize) -> usize {
 		let Some(cells) = self.grids.get(&g) else { return 0 };
@@ -812,4 +839,15 @@ mod tests {
 		assert_eq!(g.msgs.iter().map(|m| m.kind.as_str()).collect::<Vec<_>>(), ["list_cmd", "confirm"]);
 		assert!(g.key() && g.msgs.is_empty());
 	}
+}
+
+/// The SGR sequence that colours a cell: foreground always, background when it is not the default.
+fn sgr(fg: u32, bg: Option<u32>) -> String {
+	let (r, g, b) = ((fg >> 16) & 0xff, (fg >> 8) & 0xff, fg & 0xff);
+	let mut out = format!("\x1b[38;2;{r};{g};{b}m");
+	if let Some(bg) = bg {
+		let (r, g, b) = ((bg >> 16) & 0xff, (bg >> 8) & 0xff, bg & 0xff);
+		out.push_str(&format!("\x1b[48;2;{r};{g};{b}m"));
+	}
+	out
 }

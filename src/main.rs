@@ -266,6 +266,11 @@ fn view(grid: &Grid) -> View {
 	let windows: Vec<ui::Node> = splits
 		.iter()
 		.map(|(g, win)| {
+			// `NEOTERN_ANSI=1` trades the caret, the selection and the click mapping for nvim's
+			// exact colours: Tern's `ansi` node renders the SGR stream itself.
+			if std::env::var_os("NEOTERN_ANSI").is_some() {
+				return ui::ansi(grid.ansi(*g)).key(format!("w{g}")).into();
+			}
 			let cursor = (*g == cg).then(|| (grid.offset(*g, cr, cc), grid.offset(*g, cr, cc + 1)));
 			editor(grid, *g, win.h, cursor, block, &format!("w{g}")).into()
 		})
