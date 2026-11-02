@@ -201,6 +201,9 @@ pub struct Run {
 	pub marked: bool,
 	/// The run is a Nerd Font glyph (Private Use Area), which Tern draws with its icon font.
 	pub icon: bool,
+	/// The run is box drawing or a block element (`│`, `▏`). Tern's italic is synthetic for the
+	/// terminal face, so an italic guide leans off the column it is drawn to form.
+	pub box_glyph: bool,
 }
 
 /// A Telescope picker (`:h telescope`), from `telescope.lua`.
@@ -627,6 +630,7 @@ impl Grid {
 				let marked = attr.bg.is_some_and(|bg| bg != self.bg) || attr.reverse;
 				let glyph = cell.text.chars().next().map_or(0, |c| c as u32);
 				let icon = matches!(glyph, 0xe000..=0xf8ff | 0xf0000..);
+				let box_glyph = matches!(glyph, 0x2500..=0x259f);
 				match runs.last_mut() {
 					Some(run)
 						if run.to == at
@@ -634,11 +638,12 @@ impl Grid {
 							&& run.bold == attr.bold
 							&& run.italic == attr.italic
 							&& run.marked == marked
-							&& run.icon == icon =>
+							&& run.icon == icon
+							&& run.box_glyph == box_glyph =>
 					{
 						run.to += len;
 					},
-					_ => runs.push(Run { from: at, to: at + len, fg, bold: attr.bold, italic: attr.italic, marked, icon }),
+					_ => runs.push(Run { from: at, to: at + len, fg, bold: attr.bold, italic: attr.italic, marked, icon, box_glyph }),
 				}
 				text.push_str(&cell.text);
 				at += len;
