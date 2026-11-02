@@ -472,11 +472,12 @@ fn screen_css(splits: &[(u64, grid::Win)], rows: usize, cell: (f64, f64)) -> Str
 	let (cw, ch) = cell;
 	let mut css = format!("[data-role^='screen'] {{ position: relative; height: {}px; }}\n", rows as f64 * ch);
 	// Tern draws a Nerd Font glyph with its icon font, whose advance can be two cells, while nvim
-	// gave it one; the row would then drift right. Clamp every icon span in an editor to the cell
-	// nvim counted, so the rest of the row keeps its columns.
+	// gave it one; the row would then drift right. Pin every icon span in an editor to the cell
+	// nvim counted. No `overflow: hidden`: a terminal lets the wide glyph paint over the next blank
+	// cell, and clipping it here would cut the icon in half.
 	let _ = writeln!(
 		css,
-		".sf-editor .sf-t-icon {{ display: inline-block; width: {cw}px; overflow: hidden; }}"
+		".sf-editor .sf-t-icon {{ display: inline-block; width: {cw}px; }}"
 	);
 	for (g, win) in splits {
 		let (left, top) = (win.col as f64 * cw, win.row as f64 * ch);
