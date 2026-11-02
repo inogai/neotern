@@ -108,6 +108,7 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
 	nvim.notify("nvim_exec_lua", vec![include_str!("float.lua").into(), Value::Array(vec![])])?;
 	nvim.notify("nvim_exec_lua", vec![include_str!("telescope.lua").into(), Value::Array(vec![])])?;
 	nvim.notify("nvim_exec_lua", vec![include_str!("keys.lua").into(), Value::Array(vec![])])?;
+	nvim.notify("nvim_exec_lua", vec![include_str!("colors.lua").into(), Value::Array(vec![])])?;
 	let mut grid = Grid::default();
 	// The field Tern's caret sits in, the cell box Tern draws with, and the sheet that places the
 	// window boxes. The CSS engine has no `ch` unit, so the boxes are pixels of that cell.
@@ -277,7 +278,7 @@ fn view(grid: &Grid) -> View {
 	for (i, (_, name)) in grid.tabs.iter().enumerate() {
 		let tail = name.rsplit('/').next().filter(|t| !t.is_empty()).unwrap_or("[No Name]");
 		let mut label = match grid.icons.get(tail) {
-			Some((glyph, fg)) => spans(&format!("{glyph} "), *fg, false),
+			Some((glyph, fg)) => spans(grid, &format!("{glyph} "), *fg, false),
 			None => Vec::new(),
 		};
 		label.push(ui::span(tail));
@@ -287,7 +288,7 @@ fn view(grid: &Grid) -> View {
 		tabs = tabs.active(i.to_string());
 	}
 	// barbecue's breadcrumbs, one line; a blank one keeps the grid's height when there are none.
-	let mut crumbs: Vec<ui::Span> = grid.crumbs.iter().flat_map(|c| spans(&c.text, c.fg, c.bold)).collect();
+	let mut crumbs: Vec<ui::Span> = grid.crumbs.iter().flat_map(|c| spans(grid, &c.text, c.fg, c.bold)).collect();
 	if crumbs.is_empty() {
 		crumbs.push(ui::span(" "));
 	}
@@ -398,10 +399,10 @@ fn view(grid: &Grid) -> View {
 	}
 	// The status line in Tern's status strip: a segment per highlight run of 'statusline'. Tern's
 	// strip has no middle group, so the middle runs are one segment that `PALETTE_CSS` centers.
-	let seg = |c: &grid::Chunk| ui::seg(spans(c.text.trim(), c.fg, c.bold));
+	let seg = |c: &grid::Chunk| ui::seg(spans(grid, c.text.trim(), c.fg, c.bold));
 	let shown = |side: u8| grid.status.iter().enumerate().filter(move |(_, c)| c.side == side && !c.text.trim().is_empty());
 	let mut status = ui::status().key("st").children(shown(0).map(|(i, c)| seg(c).key(i)));
-	let mid: Vec<ui::Span> = shown(1).flat_map(|(_, c)| spans(&c.text, c.fg, c.bold)).collect();
+	let mid: Vec<ui::Span> = shown(1).flat_map(|(_, c)| spans(grid, &c.text, c.fg, c.bold)).collect();
 	if !mid.is_empty() {
 		status = status.child(ui::seg(mid).key("mid").role("mid"));
 	}
@@ -417,7 +418,7 @@ fn editor(grid: &Grid, g: u64, h: usize, cursor: Option<(usize, usize)>, block: 
 	let (text, runs) = grid.text(g);
 	let mut decor = runs
 		.iter()
-		.map(|r| ui::Decor { from: r.from, to: r.to, s: token(r.fg, r.bold, r.italic, r.marked), fx: None })
+		.map(|r| ui::Decor { from: r.from, to: r.to, s: token(grid, r.fg, r.bold, r.italic, r.marked), fx: None })
 		.collect::<Vec<_>>();
 	if let Some((from, to)) = cursor.filter(|_| block) {
 		// `code` is a token with a background of its own, restyled as nvim's block cursor.
@@ -439,9 +440,14 @@ fn win_id(g: u64) -> String {
 	format!("main.0.screen.w{g}")
 }
 
-/// The span tokens of a cell run: its color names a `--sf-p-` variable `colors_css` defines.
-fn token(fg: u32, bold: bool, italic: bool, marked: bool) -> String {
-	let mut s = format!("c{fg:06x} mono");
+/// The span tokens of a cell run. Tern 0.9.x only draws the tokens it knows, so a colour
+/// `colors.lua` mapped becomes that token; anything else keeps the old `c<rrggbb>` class, which
+/// now draws no class and leaves the run in the default text colour.
+fn token(grid: &Grid, fg: u32, bold: bool, italic: bool, marked: bool) -> String {
+	let mut s = match grid.tone(fg) {
+		Some(tone) => format!("{tone} mono"),
+		None => format!("c{fg:06x} mono"),
+	};
 	if bold {
 		s += " strong";
 	}
@@ -468,11 +474,16 @@ fn screen_css(splits: &[(u64, grid::Win)], rows: usize, cell: (f64, f64)) -> Str
 	css
 }
 
-/// nvim text as spans: its color is the token `c<rrggbb>`, which `colors_css` defines; Nerd Font
-/// glyphs (Private Use Area) get the `icon` token. Tern draws a span with no known token as bare
-/// text, which takes no color, so each also gets `mono` (these strips are mono already).
-fn spans(text: &str, fg: Option<u32>, bold: bool) -> Vec<ui::Span> {
-	let mut style = fg.map(|fg| format!("c{fg:06x} mono")).unwrap_or_default();
+/// nvim text as spans: a mapped colour becomes its Tern token, an unmapped one the old
+/// `c<rrggbb>` class; Nerd Font glyphs (Private Use Area) get the `icon` token. Tern draws a
+/// span with no known token as bare text, which takes no color, so each also gets `mono`.
+fn spans(grid: &Grid, text: &str, fg: Option<u32>, bold: bool) -> Vec<ui::Span> {
+	let mut style = fg
+		.map(|fg| match grid.tone(fg) {
+			Some(tone) => format!("{tone} mono"),
+			None => format!("c{fg:06x} mono"),
+		})
+		.unwrap_or_default();
 	if bold {
 		style += " strong";
 	}

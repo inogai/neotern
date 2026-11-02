@@ -58,6 +58,9 @@ pub struct Grid {
 	pub icons:    HashMap<String, (String, Option<u32>)>,
 	/// nvim's `Visual` background, for the cells a window marks.
 	pub sel:      Option<u32>,
+	/// nvim colour to Tern span token, from `colors.lua`: Tern 0.9.x only knows its own tokens,
+	/// so a colour it has no token for cannot be drawn.
+	pub tones:    HashMap<u32, String>,
 	/// The hover or signature help text, from `float.lua`.
 	pub doc:      Option<String>,
 	/// The Telescope picker while one is open, from `telescope.lua`.
@@ -97,6 +100,7 @@ impl Default for Grid {
 			crumbs:   Vec::new(),
 			icons:    HashMap::new(),
 			sel:      None,
+			tones:    HashMap::new(),
 			doc:      None,
 			pick:     None,
 			keys:     None,
@@ -407,6 +411,15 @@ impl Grid {
 							(a[0].as_str().unwrap_or_default().to_owned(), rows)
 						});
 					},
+					"neotern_colors" => {
+						self.tones = a.first().and_then(Value::as_array).map_or(&[][..], Vec::as_slice)
+							.iter()
+							.filter_map(|e| {
+								let [hex, token] = e.as_array()?.as_slice() else { return None };
+								Some((u32::from_str_radix(hex.as_str()?, 16).ok()?, token.as_str()?.to_owned()))
+							})
+							.collect();
+					},
 					"neotern_status" => {
 						let runs = |v: &Value| -> Vec<Chunk> {
 							let runs = v.as_array().map_or(&[][..], Vec::as_slice);
@@ -677,6 +690,9 @@ impl Grid {
 		out.push(self.fg);
 		out
 	}
+
+	/// The Tern span token for a colour the colorscheme uses, when `colors.lua` mapped it.
+	pub fn tone(&self, fg: u32) -> Option<&str> { self.tones.get(&fg).map(String::as_str) }
 }
 
 #[cfg(test)]
