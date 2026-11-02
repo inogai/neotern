@@ -77,6 +77,9 @@ const PALETTE_CSS: &str = "
 [data-role^='w'] .sf-t-code { background: var(--tv-cur, var(--accent)); color: var(--page); border: 0; box-shadow: none; border-radius: 0; padding: 0; font: inherit; }
 [data-role='float-text'] { padding: 0; background: none; box-shadow: none; }
 [data-role='float-text'] .sf-caret { display: none; }
+/* A float's card does not inherit the region's mono face, so fzf-lua and yazi came out in sans.
+   `--mono` is Tern's own monospace variable; `--sans` is what a view uses for prose. */
+.sf-editor { font-family: var(--mono); }
 ";
 
 fn main() -> Result<ExitCode, Box<dyn Error>> {
@@ -473,7 +476,7 @@ fn screen_css(splits: &[(u64, grid::Win)], rows: usize, cell: (f64, f64)) -> Str
 	// nvim counted, so the rest of the row keeps its columns.
 	let _ = writeln!(
 		css,
-		"[data-role^='w'] .sf-t-icon {{ display: inline-block; width: {cw}px; overflow: hidden; }}"
+		".sf-editor .sf-t-icon {{ display: inline-block; width: {cw}px; overflow: hidden; }}"
 	);
 	for (g, win) in splits {
 		let (left, top) = (win.col as f64 * cw, win.row as f64 * ch);
