@@ -40,10 +40,66 @@ local tokens = {
 	Directory = 'link',
 	DiffAdd = 'ins',
 	DiffDelete = 'del',
+	-- LSP diagnostics and references.
+	DiagnosticUnderlineError = 'error',
+	DiagnosticUnderlineWarn = 'warning',
+	DiagnosticUnderlineInfo = 'info',
+	DiagnosticUnderlineHint = 'dim',
+	LspReferenceText = 'mark',
+	LspReferenceRead = 'mark',
+	LspReferenceWrite = 'mark',
+	LspInlayHint = 'dim',
+	LspCodeLens = 'dim',
+	-- Tree-sitter captures: this is where most LSP-semantic colour lands.
+	['@variable'] = 'info',
+	['@variable.parameter'] = 'num',
+	['@variable.member'] = 'info',
+	['@property'] = 'info',
+	['@field'] = 'info',
+	['@constant'] = 'num',
+	['@constant.builtin'] = 'num',
+	['@namespace'] = 'warning',
+	['@module'] = 'warning',
+	['@attribute'] = 'accent',
+	['@tag'] = 'accent',
+	['@operator'] = 'muted',
+	['@punctuation'] = 'muted',
+	['@lsp.type.function'] = 'info',
+	['@lsp.type.method'] = 'info',
+	['@lsp.type.variable'] = 'info',
+	['@lsp.type.property'] = 'info',
+	['@lsp.type.parameter'] = 'num',
+	['@lsp.type.class'] = 'warning',
+	['@lsp.type.struct'] = 'warning',
+	['@lsp.type.interface'] = 'warning',
+	['@lsp.type.enumMember'] = 'num',
+	['@lsp.type.namespace'] = 'warning',
+}
+
+-- nvim's 16 terminal colours, which is all a terminal buffer (fzf-lua, yazi) ever uses. Nothing
+-- names a highlight group there, so map the palette by meaning instead.
+local palette = {
+	[1] = 'error',
+	[2] = 'success',
+	[3] = 'warning',
+	[4] = 'info',
+	[5] = 'accent',
+	[6] = 'info',
+	[8] = 'muted',
+	[9] = 'error',
+	[10] = 'success',
+	[11] = 'warning',
+	[12] = 'info',
+	[13] = 'accent',
+	[14] = 'info',
 }
 
 local function send()
 	local out = {}
+	for i, token in pairs(palette) do
+		local c = vim.g['terminal_color_' .. i]
+		if type(c) == 'string' then out[#out + 1] = { (c:gsub('^#', '')), token } end
+	end
 	for group, token in pairs(tokens) do
 		local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = group, link = false })
 		if ok and hl and hl.fg then out[#out + 1] = { string.format('%06x', hl.fg), token } end
